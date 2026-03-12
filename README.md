@@ -15,7 +15,8 @@ Predicting King County Metro bus arrival delays using real-time transit data and
 | Source | Data | API |
 |--------|------|-----|
 | [OneBusAway Puget Sound](https://api.pugetsound.onebusaway.org) | Real-time bus predictions (scheduled vs. predicted arrival) | Key required |
-| [Open-Meteo](https://open-meteo.com) | Hourly historical weather for Seattle | Free, no key |
+| [King County Metro GTFS](https://www.soundtransit.org/GTFS-KCM/google_transit.zip) | Static schedule data — `stop_times.txt` used to get scheduled arrival times per (trip_id, stop_id) | Free download, no key |
+| [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) | Hourly historical weather for Seattle (lat 47.6062, lon -122.3321) via `archive-api.open-meteo.com/v1/archive` — variables: `temperature_2m`, `precipitation`, `wind_speed_10m`, `visibility`, `weather_code` (WMO) | Free, no key required |
 
 ## Features
 
