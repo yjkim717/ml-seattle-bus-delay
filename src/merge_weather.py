@@ -117,6 +117,9 @@ def main():
     if missing_weather > 0:
         print(f"Warning: {missing_weather} rows have no weather match")
 
+    # Drop weather columns that are all NaN
+    merged = merged.drop(columns=[c for c in merged.columns if merged[c].isna().all()])
+
     merged.to_csv(PROCESSED_FILE, index=False)
     print(f"\nSaved {len(merged)} records with weather to {PROCESSED_FILE}")
 
