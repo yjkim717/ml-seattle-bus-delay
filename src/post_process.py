@@ -83,12 +83,41 @@ def merge_gtfs(df, gtfs):
     return merged
 
 
-def deduplicate(df):
-    return (
-        df.dropna(subset=["predicted_arrival_ts"])
-          .sort_values("snapshot_ts")
+def filter_and_dedupe(df):
+    """
+    Keep only usable arrival records and deduplicate per (stop, trip, scheduled time).
+    Strategy:
+      - drop rows lacking predicted arrival or with non-positive prediction
+      - drop rows where snapshot is far from predicted arrival (>5 minutes) because bus likely wasn't at stop
+      - if collector stored number_of_stops_away, enforce equals 0 for extra safety
+      - keep the latest snapshot per stop/trip/scheduled time (closest to actual arrival)
+
+    Original logic (kept for reference):
+      # def deduplicate(df):
+      #     return (
+      #         df.dropna(subset=["predicted_arrival_ts"])
+      #           .sort_values("snapshot_ts")
+      #           .drop_duplicates(subset=["stop_id", "trip_id", "gtfs_scheduled_ts"], keep="first")
+      #     )
+    """
+    df = df.dropna(subset=["predicted_arrival_ts"]).copy()
+    df = df[df["predicted_arrival_ts"] > 0]
+
+    # Snapshot should be close to predicted arrival when the bus is at the stop
+    df["snap_pred_diff"] = (df["snapshot_ts"] - df["predicted_arrival_ts"]).abs()
+    df = df[df["snap_pred_diff"] <= 5 * 60]
+
+    # If collector recorded number_of_stops_away, enforce zero
+    if "number_of_stops_away" in df.columns:
+        df = df[df["number_of_stops_away"].fillna(0) == 0]
+
+    # Keep the latest snapshot for each stop/trip/scheduled combo
+    df = (
+        df.sort_values("snapshot_ts", ascending=False)
           .drop_duplicates(subset=["stop_id", "trip_id", "gtfs_scheduled_ts"], keep="first")
     )
+
+    return df.drop(columns=["snap_pred_diff"])
 
 
 def add_time_features(df):
@@ -109,9 +138,9 @@ def add_time_features(df):
 
 def compute_delay(df):
     df = df.copy()
-    # delay = actual arrival (snapshot when stops_away=0) - GTFS scheduled
+    # delay = predicted arrival (proxy for actual) - GTFS scheduled
     df["delay_min"] = (
-        (df["snapshot_ts"] - df["gtfs_scheduled_ts"]) / 60
+        (df["predicted_arrival_ts"] - df["gtfs_scheduled_ts"]) / 60
     ).round(2)
     return df
 
@@ -137,8 +166,8 @@ def main():
     gtfs = load_gtfs_scheduled()
     df = merge_gtfs(raw, gtfs)
 
-    print("Deduplicating...")
-    df = deduplicate(df)
+    print("Filtering & deduplicating...")
+    df = filter_and_dedupe(df)
     print(f"  Records after dedup: {len(df)}")
 
     df = compute_delay(df)
@@ -152,7 +181,8 @@ def main():
 
     # Sanity filter: drop extreme outliers (>2 hours delay or >30 min early)
     out = out[(out["delay_min"] >= -30) & (out["delay_min"] <= 120)]
-
+    # Drop columns that are now all NaN after filtering
+    out = out.drop(columns=[c for c in out.columns if out[c].isna().all()])
     os.makedirs("data/processed", exist_ok=True)
     out.to_csv(OUTPUT, index=False)
     print(f"\nSaved {len(out)} records to {OUTPUT}")
@@ -160,6 +190,11 @@ def main():
     print("\nSample delays:")
     print(out[["route_short_name", "gtfs_scheduled_ts", "snapshot_ts", "delay_min"]].head(10))
 
-
+    # Additional sanity checks
+    print("\n=== Sanity Check ===")
+    print(f"Rows: {len(out)}")
+    print(f"Columns: {out.columns.tolist()}")
+    print(f"visibility_km dropped: {'visibility_km' not in out.columns}")
+    print(f"Missing values:\n{out.isna().sum()[out.isna().sum() > 0]}")
 if __name__ == "__main__":
     main()
