@@ -48,10 +48,15 @@ ML6140-project/
 │   ├── setup_stops.py    # One-time: fetch all KC Metro routes and stops
 │   ├── collector.py      # Continuous polling loop (runs every 5 minutes)
 │   ├── post_process.py   # Raw snapshots → inferred delay records
-│   └── merge_weather.py  # Attach hourly weather from Open-Meteo
+│   ├── merge_weather.py  # Attach hourly weather from Open-Meteo
+│   ├── processing.py     # Filter weather categories for model input
+│   └── run_pipeline.py   # Run the full processing pipeline end to end
 ├── notebooks/
 │   ├── 01_eda.ipynb
-│   └── 02_modeling.ipynb
+│   ├── 02_linear_regression.ipynb
+│   ├── 03_random_forest.ipynb
+│   ├── 04_xgboost.ipynb
+│   └── 05_model_input_analysis.ipynb
 └── requirements.txt
 ```
 
@@ -64,12 +69,22 @@ python src/setup_stops.py
 # 2. Continuous data collection (run in background)
 nohup python src/collector.py > logs/collector.log 2>&1 &
 
-# 3. After data accumulates (1+ days), process it
+# 3. After data accumulates (1+ days), run the full pipeline
+python src/run_pipeline.py
+
+# Or run each step manually
 python src/post_process.py
 python src/merge_weather.py
+python src/processing.py
 
-# Output: data/processed/dataset.csv
+# Outputs:
+# - data/processed/dataset.csv      (full processed dataset)
+# - data/processed/model_input.csv  (model-ready weather subset)
 ```
+
+`dataset.csv` remains the full processed dataset. `model_input.csv` is a derived
+file that keeps only `dry`, `rain_light`, and `rain_moderate` rows and adds a
+`weather_category` column for modeling and analysis.
 
 ## Setup
 
