@@ -39,7 +39,7 @@ RAIN_MAP = {
     "99": "thunderstorm",
 }
 
-KEEP_CATEGORIES = {"dry", "rain_light", "rain_moderate", "rain_heavy"}
+KEEP_CATEGORIES = {"dry", "rain_light", "rain_moderate"}
 DROP_COLUMNS = {
     "trip_id",
     "vehicle_id",
